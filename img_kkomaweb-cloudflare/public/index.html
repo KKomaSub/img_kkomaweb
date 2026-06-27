@@ -1,0 +1,269 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>이미지·동영상 업로드</title>
+<style>
+  :root { --primary:#4A75FF; --primary-hover:#3454c4; --bg:#eef1f7; --card-bg:rgba(255,255,255,0.72); --muted:#667085; }
+  * { box-sizing:border-box; }
+  body { font-family: "Pretendard", Arial, sans-serif; background: var(--bg); margin:0; padding:24px; display:flex; justify-content:center; align-items:center; min-height:100vh; color:#222; }
+  .container { width:100%; max-width:720px; padding:30px; background:var(--card-bg); backdrop-filter: blur(15px); border-radius:18px; border:1px solid rgba(255,255,255,0.6); box-shadow:0 10px 28px rgba(0,0,0,0.1); text-align:center; animation:fadeIn .35s ease-out; }
+  @keyframes fadeIn { from { opacity:0; transform:translateY(10px); } to { opacity:1; transform:translateY(0); } }
+  h1 { margin:0 0 10px; font-size:28px; font-weight:800; }
+  p { color:var(--muted); line-height:1.55; }
+  #fileInput { padding:12px; width:100%; margin-top:14px; border-radius:12px; border:1px solid #ddd; background:white; }
+  button, .button-link { padding:13px 18px; background:var(--primary); color:white; border:none; margin-top:12px; border-radius:12px; cursor:pointer; font-size:15px; font-weight:700; transition:.2s; width:100%; text-decoration:none; display:inline-flex; justify-content:center; align-items:center; gap:6px; }
+  button:hover, .button-link:hover { background:var(--primary-hover); }
+  button.secondary, .button-link.secondary { background:#fff; color:var(--primary); border:1px solid #d9e1ff; }
+  button.secondary:hover, .button-link.secondary:hover { background:#e9eeff; }
+  button:disabled { opacity:.55; cursor:not-allowed; }
+  .row { display:grid; grid-template-columns:1fr 1fr 1fr; gap:10px; margin-top:12px; }
+  .setting { background:rgba(255,255,255,.75); border:1px solid #e5e7eb; border-radius:12px; padding:10px; text-align:left; }
+  .setting label { display:block; color:#475467; font-size:13px; margin-bottom:6px; }
+  .setting input { width:100%; border:1px solid #d0d5dd; border-radius:8px; padding:8px; }
+  details { margin-top:15px; text-align:left; }
+  summary { cursor:pointer; font-weight:700; color:#344054; }
+  #message { margin-top:15px; font-size:15px; font-weight:700; color:#344054; min-height:24px; }
+  .progress { height:9px; border-radius:999px; background:#e5e7eb; overflow:hidden; margin-top:12px; display:none; }
+  .progress > div { height:100%; width:0%; background:var(--primary); transition:width .25s; }
+  #linkContainer, #viewerActions { margin-top:22px; display:flex; flex-direction:column; gap:10px; }
+  .linkbox { background:white; padding:12px 14px; border-radius:10px; color:var(--primary); font-weight:700; word-break:break-all; text-decoration:none; display:block; }
+  #displayContainer { display:flex; justify-content:center; align-items:center; min-height:80vh; flex-direction:column; }
+  #displayImage { max-width:100%; max-height:70vh; border-radius:15px; box-shadow:0 8px 20px rgba(0,0,0,.18); cursor:pointer; background:white; }
+  .context-menu { position:absolute; background:white; border-radius:10px; border:1px solid #ccc; box-shadow:0 6px 18px rgba(0,0,0,.15); overflow:hidden; min-width:210px; z-index:10; display:none; }
+  .context-menu-item { padding:12px 15px; transition:.18s; font-size:15px; cursor:pointer; text-align:left; }
+  .context-menu-item:hover { background:#f1f4ff; color:var(--primary); }
+  .badge { display:inline-flex; align-items:center; justify-content:center; padding:5px 9px; border-radius:999px; background:#eef4ff; color:#3538cd; font-size:12px; font-weight:800; margin-left:6px; }
+  .notice { font-size:13px; color:#667085; background:rgba(255,255,255,.72); border-radius:12px; padding:10px; margin-top:14px; text-align:left; }
+  @media (max-width:640px) { body { padding:12px; } .container { padding:22px; } .row { grid-template-columns:1fr; } }
+</style>
+</head>
+<body>
+<div class="container" id="uploadContainer">
+  <h1>이미지·동영상 업로드</h1>
+  <p>이미지는 그대로 업로드하고, MP4/MOV/WEBM 등 동영상과 GIF는 브라우저에서 APNG로 변환한 뒤 <b>.png</b> 확장자로 imgbb에 업로드합니다.</p>
+  <input type="file" id="fileInput" accept="image/*,video/*,.mp4,.m4v,.mov,.webm,.mkv,.avi,.wmv,.flv,.mpeg,.mpg,.3gp,.ogv,.ts,.gif,.apng,.png" required />
+
+  <details>
+    <summary>동영상/GIF → APNG 변환 설정</summary>
+    <div class="row">
+      <div class="setting"><label for="maxSeconds">최대 길이(초)</label><input id="maxSeconds" type="number" min="1" max="300" value="15"></div>
+      <div class="setting"><label for="fps">FPS</label><input id="fps" type="number" min="1" max="30" value="12"></div>
+      <div class="setting"><label for="maxWidth">최대 너비(px)</label><input id="maxWidth" type="number" min="160" max="1920" value="720"></div>
+    </div>
+    <div class="notice">APNG는 영상보다 용량이 커질 수 있어 기본값은 빠른 변환용으로 잡았습니다. 길이·FPS·너비를 올리면 품질은 좋아지지만 업로드와 변환이 느려집니다.</div>
+  </details>
+
+  <button id="uploadButton">업로드</button>
+  <div class="progress" id="progress"><div id="progressBar"></div></div>
+  <div id="message"></div>
+  <div id="linkContainer" style="display:none;">
+    <a id="imageLink" class="linkbox" target="_blank" rel="noreferrer">공유 링크 열기</a>
+    <a id="rawLink" class="linkbox" target="_blank" rel="noreferrer">RAW 링크 열기</a>
+    <button id="copyButton">공유 링크 복사</button>
+    <button id="copyRawButton" class="secondary">RAW 링크 복사</button>
+  </div>
+</div>
+
+<div class="container" id="displayContainer" style="display:none;">
+  <h1>업로드 파일 <span id="apngBadge" class="badge" style="display:none;">APNG</span></h1>
+  <img id="displayImage" alt="uploaded image" />
+  <div id="viewerActions">
+    <button id="downloadButton">다운로드</button>
+    <button id="copyShareViewer" class="secondary">공유 링크 복사</button>
+    <button id="copyRawViewer" class="secondary">RAW 링크 복사</button>
+  </div>
+  <div class="progress" id="viewerProgress"><div id="viewerProgressBar"></div></div>
+  <div id="viewerMessage"></div>
+</div>
+
+<script type="module">
+import { convertApngUrlToMp4, convertMediaToApng, downloadBlob, encodeFilenameForHeader, isConvertibleMedia, basename } from "/assets/media-tools.js";
+
+const $ = selector => document.querySelector(selector);
+const params = new URLSearchParams(location.search);
+const id = params.get("id");
+const name = params.get("name") || "";
+const raw = params.get("raw");
+const format = params.get("format");
+
+function setStatus(message, progress = null) {
+  $("#message").textContent = message || "";
+  if (progress === null) return;
+  $("#progress").style.display = "block";
+  $("#progressBar").style.width = `${Math.max(0, Math.min(100, progress))}%`;
+}
+
+function setViewerStatus(message, progress = null) {
+  $("#viewerMessage").textContent = message || "";
+  if (progress === null) return;
+  $("#viewerProgress").style.display = "block";
+  $("#viewerProgressBar").style.width = `${Math.max(0, Math.min(100, progress))}%`;
+}
+
+async function copy(text) {
+  await navigator.clipboard.writeText(text);
+  alert("복사됨");
+}
+
+async function loadInfo(id, name) {
+  const qs = new URLSearchParams({ id, info: "1" });
+  if (name) qs.set("name", name);
+  const res = await fetch(`/api/image?${qs}`);
+  if (!res.ok) throw new Error("파일 정보를 가져오지 못했습니다.");
+  return res.json();
+}
+
+async function downloadSmart(id, name, info) {
+  const qs = new URLSearchParams({ id });
+  if (name) qs.set("name", name);
+  const apiRaw = `/api/image?${qs}`;
+  if (info?.isApng) {
+    setViewerStatus("APNG를 MP4로 변환 중입니다. 첫 실행은 ffmpeg.wasm 로딩 때문에 조금 걸릴 수 있습니다.", 3);
+    const blob = await convertApngUrlToMp4(apiRaw, basename(info.filename || id), msg => setViewerStatus(msg, null));
+    downloadBlob(blob, `${basename(info.filename || id)}.mp4`);
+    setViewerStatus("MP4 다운로드 준비 완료", 100);
+    return;
+  }
+  location.href = `/?id=${encodeURIComponent(id)}&raw=1&download=1`;
+}
+
+async function initViewer() {
+  if (!id) return;
+
+  if (raw === "1") {
+    const qs = new URLSearchParams({ id });
+    if (name) qs.set("name", name);
+    if (params.get("download") === "1") qs.set("download", "1");
+    location.replace(`/api/image?${qs}`);
+    return;
+  }
+
+  if (format === "mp4") {
+    location.replace(`/convert.html?id=${encodeURIComponent(id)}&auto=1`);
+    return;
+  }
+
+  $("#uploadContainer").style.display = "none";
+  $("#displayContainer").style.display = "flex";
+  const qs = new URLSearchParams({ id });
+  if (name) qs.set("name", name);
+  const img = $("#displayImage");
+  img.src = `/api/image?${qs}`;
+
+  const shareUrl = `${location.origin}${location.pathname}?id=${encodeURIComponent(id)}`;
+  const rawUrl = `${shareUrl}&raw=1`;
+  let info = null;
+  try {
+    info = await loadInfo(id, name);
+    if (info.isApng) {
+      $("#apngBadge").style.display = "inline-flex";
+      $("#downloadButton").textContent = "MP4로 변환해서 다운로드";
+    }
+  } catch (err) {
+    setViewerStatus(err.message);
+  }
+
+  $("#downloadButton").onclick = () => downloadSmart(id, name, info).catch(err => setViewerStatus(err.message));
+  $("#copyShareViewer").onclick = () => copy(shareUrl);
+  $("#copyRawViewer").onclick = () => copy(rawUrl);
+  setupContextMenu(img, { id, name, info, shareUrl, rawUrl });
+}
+
+$("#uploadButton").onclick = async () => {
+  const sourceFile = $("#fileInput").files[0];
+  if (!sourceFile) return alert("파일을 선택하세요.");
+
+  $("#uploadButton").disabled = true;
+  $("#progress").style.display = "block";
+  $("#progressBar").style.width = "0%";
+
+  try {
+    let uploadFile = sourceFile;
+    let kind = "image";
+
+    if (isConvertibleMedia(sourceFile)) {
+      kind = "apng";
+      const options = {
+        maxSeconds: $("#maxSeconds").value,
+        fps: $("#fps").value,
+        maxWidth: $("#maxWidth").value
+      };
+      setStatus("동영상/GIF를 APNG(.png)로 변환 준비 중...", 5);
+      uploadFile = await convertMediaToApng(sourceFile, options, msg => setStatus(msg));
+      setStatus(`APNG 변환 완료: ${(uploadFile.size / 1024 / 1024).toFixed(2)}MB`, 65);
+    }
+
+    setStatus("imgbb로 업로드 중...", 75);
+    const res = await fetch("/api/upload", {
+      method: "POST",
+      headers: {
+        "Content-Type": uploadFile.type || "application/octet-stream",
+        "X-File-Name": encodeFilenameForHeader(uploadFile.name),
+        "X-Original-Name": encodeFilenameForHeader(sourceFile.name),
+        "X-File-Kind": kind,
+        "X-Original-Mime": sourceFile.type || "application/octet-stream"
+      },
+      body: uploadFile
+    });
+
+    const data = await res.json();
+    if (!res.ok || !data.ok) throw new Error(data.error || "업로드 실패");
+
+    const shareUrl = `${location.origin}${data.shareUrl}`;
+    const rawUrl = `${location.origin}${data.rawUrl}`;
+    $("#linkContainer").style.display = "flex";
+    $("#imageLink").href = shareUrl;
+    $("#imageLink").textContent = shareUrl;
+    $("#rawLink").href = rawUrl;
+    $("#rawLink").textContent = rawUrl;
+    $("#copyButton").onclick = () => copy(shareUrl);
+    $("#copyRawButton").onclick = () => copy(rawUrl);
+    setStatus(data.isApng ? "업로드 완료! 공유 페이지에서는 MP4 다운로드 변환 버튼이 자동 표시됩니다." : "업로드 완료!", 100);
+  } catch (err) {
+    console.error(err);
+    setStatus(err.message || "오류가 발생했습니다.");
+  } finally {
+    $("#uploadButton").disabled = false;
+  }
+};
+
+function setupContextMenu(img, state) {
+  const menu = document.createElement("div");
+  menu.className = "context-menu";
+  document.body.appendChild(menu);
+
+  img.addEventListener("contextmenu", e => {
+    e.preventDefault();
+    menu.innerHTML = "";
+    const actions = [];
+    if (state.info?.isApng) {
+      actions.push({ text:"MP4로 변환해서 다운로드", action:()=>downloadSmart(state.id, state.name, state.info) });
+      actions.push({ text:"원본 APNG(.png) 열기", action:()=>window.open(state.rawUrl, "_blank") });
+    } else {
+      actions.push({ text:"이미지 다운로드", action:()=>location.href=`${state.rawUrl}&download=1` });
+    }
+    actions.push({ text:"공유 링크 복사", action:()=>copy(state.shareUrl) });
+    actions.push({ text:"RAW 링크 복사", action:()=>copy(state.rawUrl) });
+
+    actions.forEach(action => {
+      const item = document.createElement("div");
+      item.className = "context-menu-item";
+      item.textContent = action.text;
+      item.onclick = () => { menu.style.display = "none"; action.action(); };
+      menu.appendChild(item);
+    });
+
+    menu.style.top = `${e.pageY}px`;
+    menu.style.left = `${e.pageX}px`;
+    menu.style.display = "block";
+  });
+
+  document.addEventListener("click", () => menu.style.display = "none");
+}
+
+initViewer();
+</script>
+</body>
+</html>

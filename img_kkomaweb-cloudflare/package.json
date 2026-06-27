@@ -1,0 +1,13 @@
+{
+  "name": "img-kkomaweb-cloudflare",
+  "version": "2.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "wrangler pages dev public --functions=functions --compatibility-date=2025-11-01",
+    "deploy": "wrangler pages deploy public --project-name=img-kkomaweb",
+    "check": "node --check functions/api/upload.js && node --check functions/api/image.js && node --check functions/[[path]].js && node --check functions/_lib/common.js && node --check functions/_lib/imgbb.js && node --check functions/_lib/image-handler.js"
+  },
+  "devDependencies": {
+    "wrangler": "latest"
+  }
+}
